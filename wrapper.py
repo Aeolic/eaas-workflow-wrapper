@@ -48,7 +48,7 @@ def main():
         wait_queue_response = requests.get(wait_queue_url)
         q_json = wait_queue_response.json()
 
-        if not q_json["done"]:
+        if not q_json["isDone"]:
             print("Tool is still running.")
             time.sleep(5)
         else:
