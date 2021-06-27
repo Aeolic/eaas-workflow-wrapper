@@ -3,6 +3,7 @@ import os
 import pathlib
 import re
 import shutil
+import sys
 import time
 import zipfile
 
@@ -14,20 +15,43 @@ LOG_DIR = "/app/logs"
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        "Wrapper for the EAAS Workflow API, automatically starts a container based tool and retrieves the output!")
+    # parser = argparse.ArgumentParser(
+    #     "Wrapper for the EAAS Workflow API, automatically starts a container based tool and retrieves the output!")
+    #
+    # parser.add_argument("environmentId", type=str, help="The Id of the environment.")
+    # parser.add_argument("-f", "--files", nargs="*")
+    # parser.add_argument("-p", "--params", nargs="*")
+    #
+    # args = parser.parse_args()
+    # env_id, files, params = args.environmentId, args.files, args.params
+    #
+    # print("Env ID", env_id)
+    # print("Data", files)
+    # print("Params", params)
 
-    parser.add_argument("environmentId", type=str, help="The Id of the environment.")
-    parser.add_argument("files", nargs="*")
+    args = sys.argv
+    print(args)
+    env_id = args[1]
 
-    args = parser.parse_args()
-    env_id, data = args.environmentId, args.files
+    files = []
+    params = {}
+
+    index = 0
+    for i, file in enumerate(args[3:]):
+        if file in ["-p", "--params"]:
+            index = i + 4
+            break
+        files.append(file)
+
+    for i2, param in enumerate(args[index:]):
+        params[i2] = param
 
     print("Env ID", env_id)
-    print("Data", data)
+    print("Data", files)
+    print("Params", params)
 
     input_files = {}
-    for file_path in data:
+    for file_path in files:
 
         try:
             file = open(file_path, "rb")
@@ -44,10 +68,9 @@ def main():
 
     print("Starting Workflow!")
 
-
     # TODO überall status checks, falls nicht richtiger status: error + stop
 
-    json_to_send = {"environmentId": env_id, "inputFiles": input_files}
+    json_to_send = {"environmentId": env_id, "inputFiles": input_files, "params": params}
     print("Sending Json: ", json_to_send)
     wf_response = requests.post(EMIL_BASE_URL + "/workflow/api/v1/workflow",
                                 json=json_to_send)
