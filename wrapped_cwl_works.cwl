@@ -2,7 +2,6 @@ class: CommandLineTool
 id: template.cwl
 inputs:
 - id: biom
-  format: http://edamontology.org/format_3746
   type: File?
 - id: hdf5
   label: Output as HDF5-formatted table.
@@ -46,7 +45,7 @@ requirements:
   - entryname: config.json
     entry: |-
       {
-          "environmentId": "65e75ba0-63f9-4c4e-9cea-04e3f97f4b66",
+          "environmentId": "50e4bdfa-0762-430e-abae-7b73c4b50da4",
           "inputFolder": "/input",
           "outputFolder": "/output",
           "inputFiles": [
@@ -63,7 +62,7 @@ requirements:
               "--to-json": "$(inputs.json)",
               "--table-type": "$(inputs.table_type)",
               "--to-tsv": "$(inputs.tsv)",
-              "--output-fp": "${ var ext = \"\";   if (inputs.json) { ext = \"_json.biom\"; }   if (inputs.hdf5) { ext = \"_hdf5.biom\"; }   if (inputs.tsv) { ext = \"_tsv.biom\"; }   var pre = inputs.biom.nameroot.split('.');   pre.pop()   return pre.join('.') + ext; }",
+              "--output-fp": "${ var ext = "/output/";    if (inputs.json) { ext += "_json.biom";} if (inputs.hdf5) { ext += "_hdf5.biom"; }    if (inputs.tsv) { ext += "_tsv.biom"; }    var pre = inputs.biom.nameroot.split('.');    pre.pop();    return pre.join('.') + ext; }",
               "--collapsed-observations": "true"
           }
       }

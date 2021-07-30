@@ -12,7 +12,7 @@ import requests
 
 EMIL_BASE_URL = "https://historic-builds.emulation.cloud/emil"
 OUTPUT_DIR = "/app/output"
-# LOG_DIR = "/app/logs"
+# OUTPUT_DIR = "output"
 
 
 def main():
@@ -77,10 +77,25 @@ def main():
 
     json_data["inputFiles"] = input_files
 
-    # TODO überall status checks, falls nicht richtiger status: error + stop
+    index = len(json_data["arguments"])
 
+    for key, val in json_data["unordered"].items():
+        # not specified or flags set to false
+        if val in ["null", "false"]:
+            continue
+        # flags set to true
+        elif val == "true":
+            json_data["arguments"][str(index)] = key
+            index += 1
+        # other arguments (lists/arrays not supported)
+        else:
+            json_data["arguments"][str(index)] = key
+            json_data["arguments"][str(index + 1)] = val
+            index += 2
 
     print("Sending Json: ", json_data)
+
+    # TODO überall status checks, falls nicht richtiger status: error + stop
     wf_response = requests.post(EMIL_BASE_URL + "/workflow/api/v1/workflow",
                                 json=json_data)
     wait_queue_url = wf_response.json()["waitQueueUrl"]

@@ -20,7 +20,7 @@ hints:
         version: [ "2.1.6" ]
 
 
-baseCommand: [ "biom-convert.sh" ]
+baseCommand: [ biom, convert ]
 
 inputs:
   biom:

@@ -1,22 +1,22 @@
 {
-  "environmentId": "90825a58-b795-4002-87e3-8c0b308fbcb2",
+  "environmentId": "50e4bdfa-0762-430e-abae-7b73c4b50da4",
   "inputFolder": "/input",
-  "outputFolder": "/app/output",
+  "outputFolder": "/output",
   "inputFiles": [
-    "testfile.txt"
+    "F:\\Thesis\\pipeline-v5-master\\tools\\RNA_prediction\\biom-convert\\expected_output\\biom-convert\\test-mapseq.tsv"
   ],
   "arguments": {
-    "0": "python3",
-    "1": "/app/main.py",
-    "2": "/input/testfile.txt"
+    "0": "biom",
+    "1": "convert"
+  },
+  "unordered": {
+    "--input-fp": "/input/test-mapseq.tsv",
+    "--to-hdf5": "null",
+    "--header-key": "null",
+    "--to-json": "true",
+    "--table-type": "OTU table",
+    "--to-tsv": "null",
+    "--collapsed-observations": "true",
+    "--output-fp": "/output/_json.biom"
   }
-},
-
-
-{
-  "environmentId": 90825a58-b795-4002-87e3-8c0b308fbcb2,
-  "inputFolder": /input,
-  "outputFolder": /app/output,
-  "inputFiles": ["/var/lib/cwl/stgd6847990-8eac-49d3-b2b5-237a431148b8/originalFile.txt"],
-  "arguments": {"0": "python3", "1": "/app/main.py", "2": "/input/testfile.txt"}
 }
