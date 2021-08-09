@@ -42,7 +42,7 @@ outputs:
     outputBinding:
       glob: '*.log'
 """
-SHOULD_UPLOAD = False
+SHOULD_UPLOAD = True
 
 
 # TODO format somehow doesn't work for wrapped cwl?
@@ -359,7 +359,7 @@ def rewrite(cwl_file):
 
 
 # cwl_file = Path("E:\\Thesis\\TestTool\\test-auto.cwl")
-# cwl_file_path = Path("E:\\Thesis\\CwlEnvironmentStarter\\biom_convert.cwl")
-cwl_file_path = Path("E:\Thesis\workflowWindows\jurek\\1st-workflow.cwl")
+cwl_file_path = Path("E:\\Thesis\\CwlEnvironmentStarter\\biom_convert.cwl")
+# cwl_file_path = Path("E:\Thesis\workflowWindows\jurek\\1st-workflow.cwl")
 
 rewrite(cwl_file_path)

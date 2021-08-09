@@ -45,7 +45,7 @@ requirements:
   - entryname: config.json
     entry: |-
       {
-          "environmentId": "50e4bdfa-0762-430e-abae-7b73c4b50da4",
+          "environmentId": "ee06bb2c-2f5f-4c91-8e7a-2ff5937bb091",
           "inputFolder": "/input",
           "outputFolder": "/output",
           "inputFiles": [

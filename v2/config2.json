@@ -1,0 +1,4 @@
+{
+  "environmentId": "90825a58-b795-4002-87e3-8c0b308fbcb2",
+  "initialWorkDirRequirements": ["config.json", "config2.json"]
+}
