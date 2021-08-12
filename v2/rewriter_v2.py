@@ -7,7 +7,8 @@ from threading import Thread
 
 import requests
 from cwl_utils.parser_v1_0 import CommandInputArraySchema, Dirent, InitialWorkDirRequirement, \
-    DockerRequirement, CommandLineTool, Workflow, CommandLineBinding
+    DockerRequirement, CommandLineTool, Workflow, CommandLineBinding, CommandOutputParameter, File, \
+    CommandOutputBinding
 from ruamel import yaml
 import sys
 
@@ -85,7 +86,6 @@ def rewrite(cwl_file):
     print(cwl_file.as_uri())
 
     cwl_obj = parser.load_document_by_yaml(yaml_obj, cwl_file.as_uri())
-    new_cwl = parser.load_document_by_string(TEMPLATE, "template.cwl")
 
     # TODO this !!!!!!
     # TODO add flag to skip command line tool if no dockerPull
@@ -113,8 +113,7 @@ def rewrite(cwl_file):
 
             exit(0)
 
-
-    dockerPull = ""
+    dockerPull = None
     dockerOutputDirectory = ""
     original_initial_workdir_req_listing = []
 
@@ -125,8 +124,10 @@ def rewrite(cwl_file):
                 for tup in hint:
                     if tup == "dockerPull":
                         dockerPull = hint[tup]
+                        hint[tup] = "aeolic/cwl-wrapper:latest"
                     if tup == "dockerOutputDirectory":
                         dockerOutputDirectory = hint[tup]
+                        hint[tup] = "/app/output"
 
     try:
         for req in cwl_obj.requirements:
@@ -134,8 +135,10 @@ def rewrite(cwl_file):
             if type(req) == DockerRequirement:
                 if req.dockerPull:
                     dockerPull = req.dockerPull
+                    req.dockerPull = "aeolic/cwl-wrapper:latest"
                 if req.dockerOutputDirectory:
                     dockerOutputDirectory = req.dockerOutputDirectory
+                    req.dockerOutputDirectory = "/app/output"
 
             if type(req) == InitialWorkDirRequirement:
                 original_initial_workdir_req_listing.extend(req.listing)
@@ -144,6 +147,10 @@ def rewrite(cwl_file):
 
     except Exception as e:
         print("Something went wrong while reading DockerRequirement:", e)
+
+    if not dockerPull:
+        print("CWL did not have dockerPull, returning")
+        return
 
     # TODO - backend hochladen, id zurückkriegen (falls es schon gibt, ansonsten neu anlegen)
 
@@ -154,41 +161,41 @@ def rewrite(cwl_file):
 
     output_folder = dockerOutputDirectory if dockerOutputDirectory else "/output"
 
-
     config_json = {
         "environmentId": env_id,
         "outputFolder": output_folder,
         "initialWorkDirRequirements": [x.entryname for x in original_initial_workdir_req_listing]
     }
 
-
-    new_cwl.inputs.extend(cwl_obj.inputs)
+    for inp in cwl_obj.inputs:
+        inp.id = inp.id.split("#")[1]  # to remove absolut paths
 
     for outp in cwl_obj.outputs:
         outp.id = outp.id.split("#")[1]
 
-    new_cwl.outputs.extend(cwl_obj.outputs)
+    outpBinding = CommandOutputBinding(glob="*.log")
+    log_output = CommandOutputParameter("logfile", type="File", outputBinding=outpBinding)
+    cwl_obj.outputs.append(log_output)
+
     entry = json.dumps(config_json, indent=4, separators=(',', ': '))
 
     new_workdir_req = Dirent(entry, entryname="config.json")
 
-    for req in new_cwl.requirements:
+    for req in cwl_obj.requirements:
         if type(req) == InitialWorkDirRequirement:
-            req.listing.clear()
             req.listing.append(new_workdir_req)
-            req.listing.extend(original_initial_workdir_req_listing)
 
-    new_cwl.save()
+    cwl_obj.save()
 
     head, tail = os.path.split(cwl_file)  # use this for the actual file?
     rewritten_name = head + "/wrapped_" + tail
 
     print("Writing file to:", rewritten_name)
     with open(rewritten_name, "w+") as f:
-        final = convert_tool_to_yaml(new_cwl)
+        final = convert_tool_to_yaml(cwl_obj)
 
-        final = final.replace('"${var', '${var')
-        final = final.replace('r}"', 'r}')
+        # final = final.replace('"${var', '${var')
+        # final = final.replace('r}"', 'r}')
 
         f.write(final)
 
@@ -201,3 +208,6 @@ cwl_file_path = Path("E:\\Thesis\\TestTool\\test-auto.cwl")
 # cwl_file_path = Path("E:\Thesis\workflowWindows\jurek\\1st-workflow.cwl")
 
 rewrite(cwl_file_path)
+
+# TODOS: runtime.X
+# TODO env requirement
