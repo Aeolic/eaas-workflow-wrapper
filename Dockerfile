@@ -11,7 +11,7 @@ RUN mkdir /app/logs
 COPY requirements.txt requirements.txt
 RUN pip3 install -r requirements.txt
 
-COPY v2/wrapper_v2.py wrapper.py
+COPY v2/wrapper_v2.py /app/wrapper.py
 
 # CMD ["python3", "wrapper.py", "envID", "input1.txt", "input2.txt"]
 

@@ -49,7 +49,7 @@ SHOULD_UPLOAD = False
 # TODO format somehow doesn't work for wrapped cwl?
 
 def convert_tool_to_yaml(tool):
-    tool_dict = tool.save()
+    tool_dict = tool.save(top=True)
 
     io = StringIO()
 
@@ -57,6 +57,9 @@ def convert_tool_to_yaml(tool):
 
     yaml.round_trip_dump(tool_dict, io, default_style=None, default_flow_style=False, indent=2,
                          block_seq_indent=0, line_break=0, explicit_start=False)
+
+    # print(io.getvalue())
+
     return io.getvalue()
 
 
@@ -87,7 +90,11 @@ def rewrite(cwl_file):
 
     cwl_obj = parser.load_document_by_yaml(yaml_obj, cwl_file.as_uri())
 
-    # TODO this !!!!!!
+    # print("List of object attributes:\n{}".format("\n".join(map(str, dir(cwl_obj)))))
+    if cwl_obj.loadingOptions:
+        print(cwl_obj.loadingOptions)
+        print(cwl_obj.loadingOptions.namespaces)
+
     # TODO add flag to skip command line tool if no dockerPull
     if isinstance(cwl_obj, Workflow):
         if cwl_obj.steps:
@@ -96,7 +103,7 @@ def rewrite(cwl_file):
             # FIXME remove windows only 8: hack
             # TODO only rewrite if dockerPull flag in command line tool
             for step in cwl_obj.steps:
-                print(step.run)
+                print("Step:", step.run)
                 rewrite(Path(step.run[8:]))
 
                 head, tail = os.path.split(Path(step.run[8:]))  # use this for the actual file?
@@ -113,53 +120,61 @@ def rewrite(cwl_file):
 
             exit(0)
 
-    dockerPull = None
-    dockerOutputDirectory = ""
+    docker_pull = None
+    docker_output_directory = ""
     original_initial_workdir_req_listing = []
 
     if cwl_obj.hints:
 
+        has_docker_hint = False
         for hint in cwl_obj.hints:
-            if "DockerRequirement" in str(hint):
-                for tup in hint:
-                    if tup == "dockerPull":
-                        dockerPull = hint[tup]
-                        hint[tup] = "aeolic/cwl-wrapper:latest"
-                    if tup == "dockerOutputDirectory":
-                        dockerOutputDirectory = hint[tup]
-                        hint[tup] = "/app/output"
+            print("HINT:", hint)
+            if hint["class"] == "DockerRequirement":
+                print("FOUND DOCKER HINT")
+                has_docker_hint = True
+                docker_pull = hint["dockerPull"]
+                if "dockerOutputDirectory" in hint:
+                    docker_output_directory = hint["dockerOutputDirectory"]
+            break
+        if has_docker_hint:
+            print("Deleting:", hint)
+            cwl_obj.hints.remove(hint)
 
     try:
+        docker_req_found = False
         for req in cwl_obj.requirements:
             print(req)
             if type(req) == DockerRequirement:
+                docker_req_found = True
                 if req.dockerPull:
-                    dockerPull = req.dockerPull
+                    docker_pull = req.dockerPull
                     req.dockerPull = "aeolic/cwl-wrapper:latest"
                 if req.dockerOutputDirectory:
-                    dockerOutputDirectory = req.dockerOutputDirectory
-                    req.dockerOutputDirectory = "/app/output"
+                    docker_output_directory = req.dockerOutputDirectory
+                req.dockerOutputDirectory = "/app/output"  # TODO add even if no output in original
 
             if type(req) == InitialWorkDirRequirement:
                 original_initial_workdir_req_listing.extend(req.listing)
 
             # TODO other requirements + hints (interesting for prov doc)
 
+        if not docker_req_found:
+            docker_req = DockerRequirement(dockerPull="aeolic/cwl-wrapper:latest", dockerOutputDirectory="/app/output") # TODO remove duplicate
+            cwl_obj.requirements.append(docker_req)
+
     except Exception as e:
         print("Something went wrong while reading DockerRequirement:", e)
 
-    if not dockerPull:
+    if not docker_pull:
         print("CWL did not have dockerPull, returning")
         return
-
-    # TODO - backend hochladen, id zurückkriegen (falls es schon gibt, ansonsten neu anlegen)
 
     env_id = "50e4bdfa-0762-430e-abae-7b73c4b50da4"
 
     if SHOULD_UPLOAD:
-        env_id = containerImport.import_image(dockerPull)
+        env_id = containerImport.import_image(docker_pull)
 
-    output_folder = dockerOutputDirectory if dockerOutputDirectory else "/output"
+    output_folder = docker_output_directory if docker_output_directory else "/output"
 
     config_json = {
         "environmentId": env_id,
@@ -179,13 +194,26 @@ def rewrite(cwl_file):
 
     entry = json.dumps(config_json, indent=4, separators=(',', ': '))
 
-    new_workdir_req = Dirent(entry, entryname="config.json")
+    new_workdir_req = [Dirent(entry, entryname="config.json")]  # TODO to list: []?
 
-    for req in cwl_obj.requirements:
-        if type(req) == InitialWorkDirRequirement:
-            req.listing.append(new_workdir_req)
+    # TODO ADD WRAPPER AS BASE COMMAND
 
-    cwl_obj.save()
+    print("BASE COMMAND:", cwl_obj.baseCommand)
+    cwl_obj.baseCommand.insert(0, "python3")
+    cwl_obj.baseCommand.insert(1, "/app/wrapper.py")
+    print("BASE COMMAND:", cwl_obj.baseCommand)
+
+    config_json_set = False
+    if (cwl_obj.requirements):
+        for req in cwl_obj.requirements:
+            if type(req) == InitialWorkDirRequirement:
+                req.listing.append(new_workdir_req)
+                config_json_set = True
+
+    if not config_json_set:
+        config_json_req = InitialWorkDirRequirement(new_workdir_req)
+
+        cwl_obj.requirements.append(config_json_req)
 
     head, tail = os.path.split(cwl_file)  # use this for the actual file?
     rewritten_name = head + "/wrapped_" + tail
@@ -203,10 +231,10 @@ def rewrite(cwl_file):
     # TODO when using runtime.outdir, wrapper output will be used instead of proper output path
 
 
-cwl_file_path = Path("E:\\Thesis\\TestTool\\test-auto.cwl")
-# cwl_file_path = Path("E:\\Thesis\\CwlEnvironmentStarter\\biom_convert.cwl")
+# cwl_file_path = Path("E:\\Thesis\\TestTool\\test-auto.cwl")
+cwl_file_path = Path("E:\\Thesis\\CwlEnvironmentStarter\\biom_convert.cwl")
 # cwl_file_path = Path("E:\Thesis\workflowWindows\jurek\\1st-workflow.cwl")
-
+# cwl_file_path = Path("F:/Thesis/pipeline-v5-master-wrapper-tests/workflows/subworkflows/assembly/kegg_analysis.cwl")
 rewrite(cwl_file_path)
 
 # TODOS: runtime.X
