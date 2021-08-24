@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tarfile
 import time
@@ -52,6 +53,42 @@ def tar_initial_work_dir_requirements(file_paths):
         for p in file_paths:
             print("Adding:", p)
             tar.add(p)
+
+def cp_parents(target_dir, files):
+    dirs = []
+    for file in files:
+        dirs.append(os.path.dirname(file))
+    dirs.sort(reverse=True)
+    for i in range(len(dirs)):
+        if not dirs[i] in dirs[i-1]:
+            need_dir = os.path.normpath(target_dir + dirs[i])
+            print("Creating", need_dir )
+            os.makedirs(need_dir)
+    for file in files:
+        dest = os.path.normpath(target_dir + file)
+        print("Copying %s to %s" % (file, dest))
+        shutil.copy(file, dest)
+
+
+def removeEmptyFolders(path, removeRoot=True):
+    'Function to remove empty folders'
+    if not os.path.isdir(path):
+        return
+
+    # remove empty subfolders
+    files = os.listdir(path)
+    if len(files):
+        for f in files:
+            fullpath = os.path.join(path, f)
+            if os.path.isdir(fullpath):
+                removeEmptyFolders(fullpath)
+
+    # if folder empty, delete it
+    files = os.listdir(path)
+    if len(files) == 0 and removeRoot:
+        # print("Removing empty folder:", path)
+        os.rmdir(path)
+
 
 
 def main():
@@ -114,6 +151,7 @@ def main():
     shutil.rmtree(temp_dir, ignore_errors=True)
 
     os.mkdir(temp_dir)
+    # os.chmod(temp_dir, 0o777)
 
     with open(temp_dir + "/files.tgz", "wb") as f:
         f.write(blobstore_response.content)
@@ -127,14 +165,24 @@ def main():
     tmp2 = os.path.join(tmp1, os.listdir(tmp1)[0])
     outputDir = os.path.join(tmp2, "outputDir")
 
+    print("OutputDIR: ", outputDir)
+    removeEmptyFolders(outputDir)
+
+    for root, dirs, files in os.walk(outputDir):
+        for file in files:
+            print("Output file before copy:", os.path.join(root, file))
+
+    # cp_parents(OUTPUT_DIR, output_files)
+    # subprocess.run(["cp", "-r",  "/tempDir/*",  "/app/output/"], shell=True)
+    # os.system("cp -r /tempDir/* /app/output/")
     shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
-    copy_tree(outputDir, OUTPUT_DIR)
+    shutil.copytree(outputDir, OUTPUT_DIR, dirs_exist_ok=True)
     shutil.rmtree(temp_dir)
 
-    print("Files in output: ")
+    print("Files in ", OUTPUT_DIR)
     for root, dirs, files in os.walk(OUTPUT_DIR):
         for file in files:
-            print(file)
+            print(os.path.join(root, file))
 
     print("Done! Files stored at: " + OUTPUT_DIR)
 

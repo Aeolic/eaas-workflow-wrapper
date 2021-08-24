@@ -91,26 +91,30 @@ def rewrite(cwl_file):
     cwl_obj = parser.load_document_by_yaml(yaml_obj, cwl_file.as_uri())
 
     # print("List of object attributes:\n{}".format("\n".join(map(str, dir(cwl_obj)))))
-    if cwl_obj.loadingOptions:
-        print(cwl_obj.loadingOptions)
-        print(cwl_obj.loadingOptions.namespaces)
 
     # TODO add flag to skip command line tool if no dockerPull
     if isinstance(cwl_obj, Workflow):
         if cwl_obj.steps:
             print("WORKFLOW DETECTED ")
 
-            # FIXME remove windows only 8: hack
+
+            # FIXME check if [8:] works on unix as well
             # TODO only rewrite if dockerPull flag in command line tool
             for step in cwl_obj.steps:
-                print("Step:", step.run)
-                rewrite(Path(step.run[8:]))
+                print("Step:", step.run, step.run[8:])
+                is_rewritten = rewrite(Path(step.run[8:]))
+
+                if not is_rewritten:
+                    continue
 
                 head, tail = os.path.split(Path(step.run[8:]))  # use this for the actual file?
-                rewritten_name = "wrapped_" + tail
+                rewritten_name = head +"/wrapped_" + tail
+                rewritten_name = rewritten_name.replace("\\", "/")
 
                 step.run = rewritten_name
 
+            # cwl_obj.id = cwl_obj.id[8:]
+            print("ID::", cwl_obj.id)
             head_wf, tail_wf = os.path.split(cwl_file.as_uri()[8:])  # use this for the actual file?
             uri_ = head_wf + "/wrapped_workflow_" + tail_wf
             print("Writing file to:", uri_)
@@ -128,27 +132,23 @@ def rewrite(cwl_file):
 
         has_docker_hint = False
         for hint in cwl_obj.hints:
-            print("HINT:", hint)
             if hint["class"] == "DockerRequirement":
-                print("FOUND DOCKER HINT")
                 has_docker_hint = True
                 docker_pull = hint["dockerPull"]
                 if "dockerOutputDirectory" in hint:
                     docker_output_directory = hint["dockerOutputDirectory"]
             break
         if has_docker_hint:
-            print("Deleting:", hint)
             cwl_obj.hints.remove(hint)
 
     try:
         docker_req_found = False
         for req in cwl_obj.requirements:
-            print(req)
             if type(req) == DockerRequirement:
                 docker_req_found = True
                 if req.dockerPull:
                     docker_pull = req.dockerPull
-                    req.dockerPull = "aeolic/cwl-wrapper:latest"
+                    req.dockerPull = "aeolic/cwl-wrapper:2.7.9"
                 if req.dockerOutputDirectory:
                     docker_output_directory = req.dockerOutputDirectory
                 req.dockerOutputDirectory = "/app/output"  # TODO add even if no output in original
@@ -159,7 +159,7 @@ def rewrite(cwl_file):
             # TODO other requirements + hints (interesting for prov doc)
 
         if not docker_req_found:
-            docker_req = DockerRequirement(dockerPull="aeolic/cwl-wrapper:latest", dockerOutputDirectory="/app/output") # TODO remove duplicate
+            docker_req = DockerRequirement(dockerPull="aeolic/cwl-wrapper:2.7.9", dockerOutputDirectory="/app/output") # TODO remove duplicate
             cwl_obj.requirements.append(docker_req)
 
     except Exception as e:
@@ -167,7 +167,7 @@ def rewrite(cwl_file):
 
     if not docker_pull:
         print("CWL did not have dockerPull, returning")
-        return
+        return False
 
     env_id = "50e4bdfa-0762-430e-abae-7b73c4b50da4"
 
@@ -188,9 +188,9 @@ def rewrite(cwl_file):
     for outp in cwl_obj.outputs:
         outp.id = outp.id.split("#")[1]
 
-    outpBinding = CommandOutputBinding(glob="*.log")
-    log_output = CommandOutputParameter("logfile", type="File", outputBinding=outpBinding)
-    cwl_obj.outputs.append(log_output)
+    # outpBinding = CommandOutputBinding(glob="*.log")
+    # log_output = CommandOutputParameter("logfile", type="File", outputBinding=outpBinding)
+    # cwl_obj.outputs.append(log_output)
 
     entry = json.dumps(config_json, indent=4, separators=(',', ': '))
 
@@ -198,10 +198,8 @@ def rewrite(cwl_file):
 
     # TODO ADD WRAPPER AS BASE COMMAND
 
-    print("BASE COMMAND:", cwl_obj.baseCommand)
     cwl_obj.baseCommand.insert(0, "python3")
     cwl_obj.baseCommand.insert(1, "/app/wrapper.py")
-    print("BASE COMMAND:", cwl_obj.baseCommand)
 
     config_json_set = False
     if (cwl_obj.requirements):
@@ -218,7 +216,7 @@ def rewrite(cwl_file):
     head, tail = os.path.split(cwl_file)  # use this for the actual file?
     rewritten_name = head + "/wrapped_" + tail
 
-    print("Writing file to:", rewritten_name)
+    print("----- OUTPUT: Writing file to:", rewritten_name)
     with open(rewritten_name, "w+") as f:
         final = convert_tool_to_yaml(cwl_obj)
 
@@ -230,11 +228,13 @@ def rewrite(cwl_file):
     # TODO output in general (change backend!)
     # TODO when using runtime.outdir, wrapper output will be used instead of proper output path
 
-
+    return True
 # cwl_file_path = Path("E:\\Thesis\\TestTool\\test-auto.cwl")
-cwl_file_path = Path("E:\\Thesis\\CwlEnvironmentStarter\\biom_convert.cwl")
+# cwl_file_path = Path("E:\\Thesis\\CwlEnvironmentStarter\\biom_convert.cwl")
 # cwl_file_path = Path("E:\Thesis\workflowWindows\jurek\\1st-workflow.cwl")
 # cwl_file_path = Path("F:/Thesis/pipeline-v5-master-wrapper-tests/workflows/subworkflows/assembly/kegg_analysis.cwl")
+cwl_file_path = Path("F:/Thesis/pipeline-v5-master/tools/RNA_prediction/thesis_example_workflow/example_workflow.cwl")
+
 rewrite(cwl_file_path)
 
 # TODOS: runtime.X
