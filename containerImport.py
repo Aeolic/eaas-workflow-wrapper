@@ -58,9 +58,9 @@ def import_image(dockerPull):
             # irrelevant, gets overwritten by execution anyway (TODO maybe set properly anyway)
             "imageType": "dockerhub",
             "title": "CWL_auto_import_" + container + ":" + tag,
-            "description": '<p>Automatic import by CWL Rewriter </p>',
+            "description": '<p>Automatic import by CWL Rewriter </p>', # TODO use CWL as description?
             "author": "CWL Rewriter",  # TODO check CWL for author
-            "runtimeId": "882b1ed7-e3ae-4c9b-8733-c183a6f0d6e0",  # TODO variable?
+            "runtimeId": "de864855-47df-4a28-bd96-34b0088e8013",  # FIXME remove hardcoded runtime id!
             "serviceContainer": False,
             "enableNetwork": False,
             "archive": "default",

@@ -1,0 +1,1 @@
+#myTool.sh --file /tmp/input1.txt -o --verbose

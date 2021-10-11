@@ -233,18 +233,21 @@ def rewrite(cwl_file):
                         array_prefix = inp.type.inputBinding.prefix
                         if pos:
                             args_ordered[
-                                str(pos + base_args_len - 1) + "_ARRAY_PREFIX"] = array_prefix
+                                str(pos + base_args_len - 1) + "_ARRAY_PREFIX"] \
+                                = array_prefix
                         inp.type.inputBinding = None
 
-                FILE_STRING_ARRAY = "${{var r = [];for (const val of inputs.{0}) {{r.push('{1}/' + val.basename);}}return r}}".format(
-                    inp.id.split("#")[1], input_folder)
-                NON_FILE_STRING_ARRAY = "${{var r = [];for (const val of inputs.{0}) {{r.push(val);}}return r}}".format(
-                    inp.id.split("#")[1])
+                FILE_ARRAY = "${{var r = [];for (const val of inputs.{0}) " \
+                             "{{r.push('{1}/' + val.basename);}}return r}}" \
+                    .format(inp.id.split("#")[1], input_folder)
+                NON_FILE_ARRAY = "${{var r = [];for (const val of inputs.{0}) " \
+                                 "{{r.push(val);}}return r}}" \
+                    .format(inp.id.split("#")[1])
 
                 if inp.type.items == "File":
-                    array_code = FILE_STRING_ARRAY
+                    array_code = FILE_ARRAY
                 else:
-                    array_code = NON_FILE_STRING_ARRAY
+                    array_code = NON_FILE_ARRAY
                 if pos:
                     args_ordered[pos + base_args_len - 1] = array_code
 
@@ -256,7 +259,8 @@ def rewrite(cwl_file):
                 NON_FILE_STRING = "$(inputs.{0})".format(
                     inp.id.split("#")[1])
 
-                str_to_use = FILE_STRING if inp.type == "File" else NON_FILE_STRING
+                str_to_use = \
+                    FILE_STRING if inp.type == "File" else NON_FILE_STRING
 
                 if pos:
                     args_ordered[pos + base_args_len - 1] = str_to_use
