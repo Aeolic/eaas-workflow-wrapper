@@ -1,6 +1,8 @@
 # Imports
 import json
 import os.path
+import shutil
+import tarfile
 import time
 from pathlib import Path, PurePath
 from threading import Thread
@@ -9,6 +11,7 @@ import requests
 from cwl_utils.parser_v1_0 import CommandInputArraySchema, Dirent, InitialWorkDirRequirement, \
     DockerRequirement, CommandLineTool, Workflow, CommandLineBinding, CommandOutputParameter, File, \
     CommandOutputBinding
+from git import Repo
 from ruamel import yaml
 import sys
 
@@ -19,6 +22,7 @@ from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 import containerImport
 
 SHOULD_UPLOAD = False
+
 
 def convert_tool_to_yaml(tool):
     tool_dict = tool.save(top=True)
@@ -39,7 +43,7 @@ def rewrite(cwl_file):
     # Read in the cwl file from a yaml
     with open(cwl_file, "r") as cwl_h:
         yaml_obj = yaml.main.round_trip_load(cwl_h, preserve_quotes=True)
-        str_obj = cwl_file.read_text()
+        # str_obj = cwl_file.read_text()
 
     # Check CWLVersion
     if 'cwlVersion' not in list(yaml_obj.keys()):
@@ -63,7 +67,7 @@ def rewrite(cwl_file):
 
     cwl_obj = parser.load_document_by_yaml(yaml_obj, cwl_file.as_uri())
 
-    #cwl_obj = parser.load_document_by_string(str_obj, "") #Path("").as_uri())# cwl_file.as_uri())
+    # cwl_obj = parser.load_document_by_string(str_obj, "") #Path("").as_uri())# cwl_file.as_uri())
 
     # print("List of object attributes:\n{}".format("\n".join(map(str, dir(cwl_obj)))))
 
@@ -84,7 +88,7 @@ def rewrite(cwl_file):
                     continue
 
                 head, tail = os.path.split(Path(step.run[8:]))  # use this for the actual file?
-                rewritten_name = head +"/wrapped_" + tail
+                rewritten_name = head + "/wrapped_" + tail
                 rewritten_name = rewritten_name.replace("\\", "/")
 
                 print("Rewritten name:", rewritten_name)
@@ -101,7 +105,7 @@ def rewrite(cwl_file):
                 final = convert_tool_to_yaml(cwl_obj)
                 f.write(final)
 
-            exit(0)
+            return
 
     docker_pull = None
     docker_output_directory = ""
@@ -138,7 +142,8 @@ def rewrite(cwl_file):
             # TODO other requirements + hints (interesting for prov doc)
 
         if not docker_req_found:
-            docker_req = DockerRequirement(dockerPull="aeolic/cwl-wrapper:2.7.9", dockerOutputDirectory="/app/output") # TODO remove duplicate
+            docker_req = DockerRequirement(dockerPull="aeolic/cwl-wrapper:2.7.9",
+                                           dockerOutputDirectory="/app/output")  # TODO remove duplicate
             cwl_obj.requirements.append(docker_req)
 
     # except Exception as e:
@@ -212,6 +217,56 @@ def rewrite(cwl_file):
     # TODO when using runtime.outdir, wrapper output will be used instead of proper output path
 
     return True
+
+
+def onerror(func, path, exc_info):
+    """
+    Error handler for ``shutil.rmtree``.
+
+    If the error is due to an access error (read only file)
+    it attempts to add write permission and then retries.
+
+    If the error is for another reason it re-raises the error.
+
+    Usage : ``shutil.rmtree(path, onerror=onerror)``
+    """
+    import stat
+    # Is the error an access error?
+    if not os.access(path, os.W_OK):
+        os.chmod(path, stat.S_IWUSR)
+        func(path)
+    else:
+        raise
+
+
+def clone_repo(git_url):
+    # e.g. https://github.com/Aeolic/example-workflow/blob/main/example_workflow.cwl
+
+    if Path.exists(Path("git_repo")):
+        shutil.rmtree("git_repo", onerror=onerror)
+    baseurl, file_path = git_url.split("/blob/main/")
+    print(baseurl, file_path)
+    absolute_repo_path = Path("git_repo").absolute()
+    print("ABS:", absolute_repo_path)
+
+    file_to_rewrite = os.path.join(absolute_repo_path, file_path)
+    print(file_to_rewrite)
+
+    Repo.clone_from(baseurl, "git_repo")
+    return file_to_rewrite
+
+
+def tar_rewritten():
+    with tarfile.open("rewritten.tgz", "w:gz") as tar:
+        tar.add("git_repo")
+
+
+def rewrite_from_repo(git_url):
+    file_to_rewrite = clone_repo(git_url)
+    rewrite(Path(file_to_rewrite))
+    tar_rewritten()
+
+
 # cwl_file_path = Path("E:\\Thesis\\TestTool\\test-auto.cwl")
 # cwl_file_path = Path("E:\\Thesis\\CwlEnvironmentStarter\\biom_convert.cwl")
 cwl_file_path = Path("E:\Thesis\workflowWindows\jurek\\1st-workflow.cwl")
@@ -220,7 +275,11 @@ cwl_file_path = Path("E:\Thesis\workflowWindows\jurek\\1st-workflow.cwl")
 # cwl_file_path = Path("F:/Thesis/ExampleWorkflow/example_workflow.cwl")
 
 
-rewrite(cwl_file_path)
+# rewrite(cwl_file_path)
 
-# TODOS: runtime.X
-# TODO env requirement
+rewrite_from_repo("https://github.com/Aeolic/example-workflow/blob/main/example_workflow.cwl")
+
+# TODO:
+# runtime.X
+# env requirement
+# cleanup!
